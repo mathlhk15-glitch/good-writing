@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>아침마다 마음을 보냈습니다</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="page-shell">
+      <section class="intro" aria-labelledby="page-title">
+        <p class="kicker">온라인 문집</p>
+        <h1 id="page-title">아침마다 마음을 보냈습니다</h1>
+        <p class="lead">
+          카톡으로 나눈 좋은 글과 사진을 모은 작은 온라인 문집입니다.
+          어떤 날은 글로, 어떤 날은 사진으로, 누군가에게 보내고 싶었던 마음을 이곳에 쌓아둡니다.
+        </p>
+      </section>
+
+      <section class="controls" aria-label="검색과 필터">
+        <label class="search-box">
+          <span class="visually-hidden">검색어</span>
+          <input id="searchInput" type="search" placeholder="검색어를 입력하세요" autocomplete="off">
+        </label>
+        <div id="filterBar" class="filter-bar" role="list"></div>
+        <p id="resultSummary" class="result-summary" aria-live="polite"></p>
+      </section>
+
+      <section id="cardGrid" class="card-grid" aria-label="카드 목록"></section>
+    </main>
+
+    <dialog id="detailDialog" class="detail-dialog">
+      <article class="detail-panel">
+        <button class="close-button" type="button" aria-label="닫기">×</button>
+        <div id="detailContent"></div>
+      </article>
+    </dialog>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
+
