@@ -4,29 +4,73 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbzEOsTaJ8pU5926iUT4sDlO
 
 const filters = ['전체', '텍스트', '사진', '혼합', '위로', '관계', '감사', '가족', '인생', '하루'];
 
+const PAGE_SIZE = 12;
+
 let cards = [];
 
 const state = {
   query: '',
   filter: '전체',
+  total: 0,
+  hasMore: false,
+  loading: false,
 };
 
-async function loadCards() {
-  cardGrid.innerHTML = '<p class="empty-state">불러오는 중...</p>';
+async function fetchCardsPage(offset, limit) {
+  const params = new URLSearchParams({
+    action: 'cards',
+    offset: String(offset),
+    limit: String(limit),
+    query: state.query,
+    filter: state.filter,
+  });
+  const res = await fetch(`${API_URL}?${params.toString()}`);
+  if (!res.ok) throw new Error('네트워크 오류');
+  const data = await res.json();
+  const normalized = data.cards.map((card) => ({
+    ...card,
+    tags: String(card.tags || '').split(',').map((t) => t.trim()).filter(Boolean),
+    imageUrls: card.images || [],
+  }));
+  return { cards: normalized, total: data.total, hasMore: data.hasMore };
+}
+
+// reset=true: 검색어/필터가 바뀌어서 처음부터 다시 불러오는 경우
+// reset=false: "더 보기"로 이어서 불러오는 경우
+async function loadCards(reset) {
+  if (state.loading) return;
+  state.loading = true;
+
+  if (reset) {
+    cards = [];
+    cardGrid.innerHTML = '<p class="empty-state">불러오는 중...</p>';
+  } else {
+    renderCards(); // "불러오는 중..." 더보기 버튼 표시
+  }
+
   try {
-    const res = await fetch(`${API_URL}?action=cards`);
-    if (!res.ok) throw new Error('네트워크 오류');
-    const data = await res.json();
-    cards = data.map((card) => ({
-      ...card,
-      tags: String(card.tags || '').split(',').map((t) => t.trim()).filter(Boolean),
-      imageUrls: card.images || [],
-    }));
+    const page = await fetchCardsPage(cards.length, PAGE_SIZE);
+    cards = reset ? page.cards : cards.concat(page.cards);
+    state.total = page.total;
+    state.hasMore = page.hasMore;
   } catch (err) {
     cardGrid.innerHTML = `<p class="empty-state">글을 불러오지 못했습니다. API_URL 설정을 확인해주세요.</p>`;
+    state.loading = false;
     return;
   }
+  state.loading = false;
   renderCards();
+}
+
+function loadMore() {
+  loadCards(false);
+}
+
+let searchDebounceTimer = null;
+function onSearchInput(value) {
+  state.query = value;
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => loadCards(true), 300);
 }
 
 const typeLabels = {
@@ -58,27 +102,6 @@ function normalize(value) {
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim();
-}
-
-function matchesFilter(card) {
-  if (state.filter === '전체') return true;
-  if (state.filter === '텍스트') return card.type === 'text';
-  if (state.filter === '사진') return card.type === 'image';
-  if (state.filter === '혼합') return card.type === 'mixed';
-  return card.tags.includes(state.filter);
-}
-
-function matchesQuery(card) {
-  const query = normalize(state.query);
-  if (!query) return true;
-  return normalize(card.searchText).includes(query);
-}
-
-function getVisibleCards() {
-  return cards
-    .filter(matchesFilter)
-    .filter(matchesQuery)
-    .sort((a, b) => b.date.localeCompare(a.date));
 }
 
 function highlight(value) {
@@ -114,18 +137,28 @@ function renderFilters() {
 }
 
 function renderCards() {
-  const visibleCards = getVisibleCards();
-
   resultSummary.textContent = state.query
-    ? `"${state.query}" 검색 결과: ${visibleCards.length}개`
-    : `전체 글: ${visibleCards.length}개`;
+    ? `"${state.query}" 검색 결과: ${state.total}개`
+    : `전체 글: ${state.total}개`;
 
-  if (visibleCards.length === 0) {
-    cardGrid.innerHTML = '<p class="empty-state">찾은 글이 없습니다.</p>';
+  if (cards.length === 0) {
+    cardGrid.innerHTML = state.loading
+      ? '<p class="empty-state">불러오는 중...</p>'
+      : '<p class="empty-state">찾은 글이 없습니다.</p>';
     return;
   }
 
-  cardGrid.innerHTML = visibleCards.map(renderCard).join('');
+  const cardsHtml = cards.map(renderCard).join('');
+  const loadMoreHtml = state.hasMore
+    ? `<button type="button" class="load-more-btn" id="loadMoreBtn" ${state.loading ? 'disabled' : ''}>
+         ${state.loading ? '불러오는 중...' : '더 보기'}
+       </button>`
+    : '';
+
+  cardGrid.innerHTML = cardsHtml + loadMoreHtml;
+
+  const loadMoreBtn = document.getElementById('loadMoreBtn');
+  if (loadMoreBtn) loadMoreBtn.addEventListener('click', loadMore);
 }
 
 function renderCard(card) {
@@ -183,8 +216,7 @@ function showDetail(card) {
 
 function bindEvents() {
   searchInput.addEventListener('input', (event) => {
-    state.query = event.target.value;
-    renderCards();
+    onSearchInput(event.target.value);
   });
 
   filterBar.addEventListener('click', (event) => {
@@ -192,7 +224,7 @@ function bindEvents() {
     if (!button) return;
     state.filter = button.dataset.filter;
     renderFilters();
-    renderCards();
+    loadCards(true);
   });
 
   cardGrid.addEventListener('click', (event) => {
@@ -229,5 +261,5 @@ function bindEvents() {
 
 renderFilters();
 bindEvents();
-loadCards();
+loadCards(true);
 
