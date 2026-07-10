@@ -20,7 +20,7 @@ async function loadCards() {
     cards = data.map((card) => ({
       ...card,
       tags: String(card.tags || '').split(',').map((t) => t.trim()).filter(Boolean),
-      imageUrls: parseImageList_(card.imageUrl),
+      imageUrls: card.images || [],
     }));
   } catch (err) {
     cardGrid.innerHTML = `<p class="empty-state">글을 불러오지 못했습니다. API_URL 설정을 확인해주세요.</p>`;
